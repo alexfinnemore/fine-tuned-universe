@@ -153,8 +153,98 @@ npm run chat my-universe
 
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) - Technical architecture and design decisions
 - [`USER_JOURNEY.md`](./USER_JOURNEY.md) - Detailed user flows and scenarios
+- [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md) - Phased roadmap and implementation plan
 - [`post 1.md`](./post%201.md) - Original vision: collaborative universes
 - [`post 2.md`](./post%202.md) - Original vision: technical implementation
+
+## FAQ
+
+### Do I need ML or AI expertise to use this?
+
+No! You're doing clever prompt engineering, not training models. If you can edit YAML files and write markdown, you can create a universe.
+
+### How much will API costs be?
+
+Typical usage is ~$0.03-0.10 per conversation. A heavy user might spend $10-30/month. We'll add cost tracking and estimation tools (see Issue #33) so you always know what you're spending.
+
+### Can this really match actual fine-tuning?
+
+For most use cases, yes. With Claude's 200K token context window, you can fit extensive personality definitions and knowledge. It won't match the deep style imprint of actual fine-tuning on millions of examples, but it covers 90% of use cases without the complexity.
+
+### What if I want to work with images or audio?
+
+That's planned for V2 via MCP (Model Context Protocol) integration (Issue #13). V1 focuses on text, which we need to nail first. Once that's solid, multimodal capabilities are straightforward to add.
+
+### Is this just for creative/artistic uses?
+
+Not at all! It works equally well for:
+- **Writers** - Creative companions and style mirrors
+- **Researchers** - Specialized dialogue partners trained on academic texts
+- **Educators** - Custom tutors with specific pedagogical approaches
+- **Technical writers** - Domain-specific documentation assistants
+- **Anyone** with a unique voice or knowledge base they want to preserve
+
+### How is this different from Character.ai or Replika?
+
+Those are centralized platforms with limited customization. Fine-Tuned Universe is:
+- **Local-first** - Your data stays on your machine
+- **Fully customizable** - Edit every aspect via files
+- **Open source** - Inspect, modify, extend the code
+- **No lock-in** - Export and share your universes
+- **Privacy-focused** - No telemetry or data collection
+
+### What about privacy and data security?
+
+All your data (corpus, conversations, configs) stays on your machine by default. The only data sent to Anthropic is:
+- The system prompt (generated from your config)
+- Your conversation messages
+- Relevant corpus excerpts
+
+Your API key is stored locally in `.env` and never leaves your machine. We never collect telemetry or track usage.
+
+### Can I use this with other AI models (GPT-4, local models)?
+
+V1 uses Claude exclusively. V2 will support model adapters for other APIs. V3 will support local models (Ollama, LM Studio) for completely free, offline operation (Issue #19).
+
+### How long does it take to create a universe?
+
+Our target is <15 minutes for your first universe:
+- 5 min: Installation
+- 5 min: Universe creation and configuration
+- 5 min: Adding initial corpus files
+
+After that, you can continuously refine and evolve it.
+
+### Will my universe "drift" and lose its personality over time?
+
+We're building safeguards against this:
+- System prompt is regenerated for each conversation
+- Corpus is re-referenced for each query
+- Configuration enforces rules consistently
+- Memory system can create "reflections" that reinforce core traits
+
+If you notice drift, you can adjust your config rules or add more corpus examples.
+
+### Can I share my universe with others?
+
+Yes! V2 will include export/import functionality (Issue #15). Export creates a portable .zip with your config and corpus (but not your private conversations). Others can import and run your universe, or fork and customize it.
+
+Eventually we plan a universe marketplace where you can discover and share universes (Issue #18).
+
+### What's the business model? Will this cost money?
+
+The tool itself is free and open source (MIT license). You only pay for:
+- Claude API usage (your own Anthropic account)
+- Optional: Hosted web version (future, opt-in)
+
+We may explore premium features later (marketplace, hosting), but the core CLI tool will always be free.
+
+### I have more questions!
+
+- Check the [Issues](https://github.com/alexfinnemore/fine-tuned-universe/issues) for detailed technical discussions
+- Read [`USER_JOURNEY.md`](./USER_JOURNEY.md) for detailed scenarios
+- Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) for technical deep-dive
+- Open a new issue with your question
 
 ## Contributing
 
