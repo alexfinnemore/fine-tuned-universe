@@ -83,7 +83,7 @@ program
   .argument('<universe-name>', 'Name of the universe')
   .option('-p, --prompt <prompt>', 'Generation prompt')
   .option('-o, --output <file>', 'Output file path')
-  .action((name: string, options: { prompt?: string; output?: string }) => {
+  .action((name: string, _options: { prompt?: string; output?: string }) => {
     console.log(chalk.yellow('\n🚧 Coming soon: Artifact generation'));
     console.log(chalk.gray(`   Universe: ${name}\n`));
   });

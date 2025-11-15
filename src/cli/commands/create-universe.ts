@@ -2,7 +2,7 @@ import { createInterface } from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
 import chalk from 'chalk';
 import ora from 'ora';
-import { mkdirSync, writeFileSync, existsSync, cpSync } from 'fs';
+import { mkdirSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import yaml from 'js-yaml';
 import type { UniverseConfig } from '../../core/types.js';
@@ -12,7 +12,7 @@ interface CreateUniverseOptions {
   interactive?: boolean;
 }
 
-export async function createUniverse(name: string, options: CreateUniverseOptions = {}) {
+export async function createUniverse(name: string, _options: CreateUniverseOptions = {}) {
   console.log(chalk.cyan('\n🌌 Creating Universe: ') + chalk.bold(name) + '\n');
 
   // Validate name
