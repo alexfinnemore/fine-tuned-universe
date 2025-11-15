@@ -87,24 +87,31 @@ npm run collaborate industrial-mystic cybernetic-architect \
 
 ## Project Status
 
-**Current Phase**: Planning & V1 Development
+**Current Phase**: V1 MVP Complete! 🎉
 
-See [GitHub Issues](https://github.com/alexfinnemore/fine-tuned-universe/issues) for detailed roadmap.
+See [V0.1-STATUS.md](./V0.1-STATUS.md) for detailed progress and [GitHub Issues](https://github.com/alexfinnemore/fine-tuned-universe/issues) for roadmap.
 
-### V1 Goals (MVP)
-- CLI tool for creating and managing universes
-- Simple chat interface for single universe interaction
-- Markdown-based corpus management
-- System prompt configuration
-- Basic artifact generation
+### ✅ V1 Completed Features
+- ✅ CLI tool for creating and managing universes
+- ✅ Full chat interface with memory persistence (CLI + Web)
+- ✅ **Web chat interface** - chat through your browser!
+- ✅ Markdown-based corpus management
+- ✅ YAML configuration system
+- ✅ Token tracking and cost estimation
+- ✅ **Web UI with universe browsing**
+- ✅ Two complete example templates
 
-### Future Vision
+### 🔄 In Progress
+- Additional templates (Industrial Mystic, Cybernetic Architect)
+- Troubleshooting guide and documentation polish
+
+### 🚀 Future Vision (V2/V3)
 - Multi-universe collaboration
-- Web UI (deployable to Vercel)
 - MCP integration for multimodal (images, audio)
+- Vercel deployment
 - Style transfer between universes
-- Persistent memory and evolution
 - Export/share universes
+- Universe marketplace
 
 ## Why This Matters
 
@@ -137,23 +144,43 @@ This project makes that vision accessible to anyone who can use Claude Code.
 
 ## Getting Started
 
+### Quick Start (5 minutes)
+
+**1. Clone and Install**
 ```bash
-# Clone the repository
 git clone https://github.com/alexfinnemore/fine-tuned-universe.git
 cd fine-tuned-universe
-
-# Install dependencies
 npm install
-
-# Create your first universe
-npm run create-universe "my-universe" "A poetic philosopher"
-
-# Start chatting
-npm run chat my-universe
 ```
+
+**2. Configure API Key**
+```bash
+cp .env.example .env
+# Edit .env and add: ANTHROPIC_API_KEY=sk-ant-your-key-here
+```
+
+**3. Try the CLI**
+```bash
+# Chat with Universe K
+npm run chat universe-k
+
+# Or create your own universe
+npm run create-universe "my-universe"
+```
+
+**4. Try the Web Interface**
+```bash
+cd web && npm run dev
+# Open http://localhost:3000
+```
+
+See [QUICKSTART.md](./QUICKSTART.md) for detailed setup instructions.
 
 ## Documentation
 
+- [`V0.1-STATUS.md`](./V0.1-STATUS.md) - Current project status and completion
+- [`QUICKSTART.md`](./QUICKSTART.md) - 5-minute setup guide
+- [`CLAUDE.md`](./CLAUDE.md) - Development workflow and methodology
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) - Technical architecture and design decisions
 - [`USER_JOURNEY.md`](./USER_JOURNEY.md) - Detailed user flows and scenarios
 - [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md) - Phased roadmap and implementation plan
