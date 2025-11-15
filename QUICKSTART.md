@@ -41,9 +41,12 @@ This will start a chat session with Universe K, our test universe.
 While chatting, you can use these commands:
 
 - Type your message and press Enter to chat
-- `/exit` - End the conversation and see stats
+- `/exit` - Save and end the conversation (shows stats)
+- `/save` - Manually save conversation to memory
 - `/info` - Show universe details and current stats
 - `/clear` - Clear conversation history and start fresh
+
+**Note**: Conversations are automatically saved when you exit, and the last 10 messages are loaded when you start a new session!
 
 ## What is Universe K?
 

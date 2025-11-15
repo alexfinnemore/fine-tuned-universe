@@ -73,6 +73,9 @@ vocabulary: ["erosion", "ascension", "pulse of decay", "voltage"]
 npm run chat industrial-mystic
 
 > "What remains of the human when sound becomes architecture?"
+
+# Conversations are automatically saved!
+# Your last 10 messages will be loaded when you return
 ```
 
 ### 5. Collaborate (Future)
