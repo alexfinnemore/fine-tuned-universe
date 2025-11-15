@@ -1,0 +1,46 @@
+{
+  "name": "fine-tuned-universe",
+  "version": "0.1.0",
+  "description": "Create personalized AI universes with distinct personalities, knowledge, and collaborative capabilities",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "ftu": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/cli/index.ts",
+    "build": "tsc",
+    "start": "node dist/cli/index.js",
+    "chat": "tsx src/cli/index.ts chat",
+    "create-universe": "tsx src/cli/index.ts create-universe",
+    "list": "tsx src/cli/index.ts list",
+    "info": "tsx src/cli/index.ts info",
+    "generate": "tsx src/cli/index.ts generate"
+  },
+  "keywords": [
+    "ai",
+    "claude",
+    "chatbot",
+    "personalized-ai",
+    "prompt-engineering"
+  ],
+  "author": "Alex Finnemore",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "js-yaml": "^4.1.0",
+    "ora": "^8.1.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
