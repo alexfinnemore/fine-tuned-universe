@@ -95,6 +95,9 @@ See [V0.1-STATUS.md](./V0.1-STATUS.md) for detailed progress and [GitHub Issues]
 - ✅ CLI tool for creating and managing universes
 - ✅ Full chat interface with memory persistence (CLI + Web)
 - ✅ **Web chat interface** - chat through your browser!
+- ✅ **Dynamic universe theming** - unique colors per universe!
+- ✅ **Corpus file viewer & editor** - view/edit knowledge base in-browser
+- ✅ **Image gallery & upload** - visual reference for universes
 - ✅ Markdown-based corpus management
 - ✅ YAML configuration system
 - ✅ Token tracking and cost estimation

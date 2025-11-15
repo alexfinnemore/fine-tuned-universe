@@ -15,10 +15,20 @@ interface UniverseInfo {
   personality: string;
 }
 
+interface UniverseTheme {
+  primary: string;
+  secondary: string;
+  accent: string;
+  background: string;
+  text: string;
+  gradient: string[];
+}
+
 export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
   const [universe, setUniverse] = useState<UniverseInfo | null>(null);
+  const [theme, setTheme] = useState<UniverseTheme | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,9 +46,9 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Load universe info
+  // Load universe info and theme
   useEffect(() => {
-    async function fetchUniverse() {
+    async function fetchData() {
       try {
         const res = await fetch(`/api/universes/${params.id}`);
         if (!res.ok) throw new Error('Universe not found');
@@ -48,11 +58,18 @@ export default function ChatPage() {
           name: data.name,
           personality: data.personality,
         });
+
+        // Fetch theme
+        const themeRes = await fetch(`/api/universes/${params.id}/theme`);
+        if (themeRes.ok) {
+          const themeData = await themeRes.json();
+          setTheme(themeData.theme);
+        }
       } catch (err: any) {
         setError(err.message);
       }
     }
-    fetchUniverse();
+    fetchData();
   }, [params.id]);
 
   const sendMessage = async () => {
@@ -112,12 +129,21 @@ export default function ChatPage() {
     }
   };
 
+  // Apply dynamic theme
+  const bgGradient = theme
+    ? `linear-gradient(to bottom right, ${theme.gradient[0]}, ${theme.gradient[1]}, ${theme.gradient[2]})`
+    : 'linear-gradient(to bottom right, #0f172a, #581c87, #0f172a)';
+
+  const primaryColor = theme?.primary || '#8b5cf6';
+  const accentColor = theme?.accent || '#a78bfa';
+  const textColor = theme?.text || '#e9d5ff';
+
   if (error && !universe) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: bgGradient }}>
         <div className="text-center text-white">
           <p className="text-xl mb-4">❌ {error}</p>
-          <Link href="/" className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition">
+          <Link href="/" className="px-6 py-2 rounded-lg transition" style={{ backgroundColor: primaryColor }}>
             Back to Home
           </Link>
         </div>
@@ -126,15 +152,16 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="flex flex-col h-screen" style={{ background: bgGradient }}>
       {/* Header */}
-      <div className="border-b border-purple-800/30 bg-black/20 backdrop-blur-sm">
+      <div className="border-b bg-black/20 backdrop-blur-sm" style={{ borderColor: `${primaryColor}20` }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
                 href={`/universe/${params.id}`}
-                className="text-purple-300 hover:text-white transition"
+                className="hover:text-white transition"
+                style={{ color: accentColor }}
               >
                 ← Back
               </Link>
@@ -143,16 +170,16 @@ export default function ChatPage() {
                   💬 {universe?.name || 'Loading...'}
                 </h1>
                 {universe && (
-                  <p className="text-purple-300 text-sm mt-1">{universe.personality}</p>
+                  <p className="text-sm mt-1" style={{ color: accentColor }}>{universe.personality}</p>
                 )}
               </div>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <div className="text-purple-200 text-sm">
+                <div className="text-sm" style={{ color: textColor }}>
                   {totalTokens.toLocaleString()} tokens
                 </div>
-                <div className="text-purple-400 text-xs">
+                <div className="text-xs" style={{ color: accentColor }}>
                   ${totalCost.toFixed(4)}
                 </div>
               </div>
@@ -173,9 +200,9 @@ export default function ChatPage() {
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.length === 0 && (
-            <div className="text-center text-purple-300 py-12">
+            <div className="text-center py-12" style={{ color: accentColor }}>
               <p className="text-xl mb-2">Start a conversation</p>
-              <p className="text-sm text-purple-400">
+              <p className="text-sm" style={{ color: textColor }}>
                 Type a message below to begin chatting with {universe?.name}
               </p>
             </div>
@@ -187,13 +214,21 @@ export default function ChatPage() {
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-3xl rounded-xl p-4 ${
-                  msg.role === 'user'
-                    ? 'bg-purple-600/30 border border-purple-500/30 text-purple-50'
-                    : 'bg-white/5 border border-purple-500/20 text-purple-100'
-                }`}
+                className="max-w-3xl rounded-xl p-4 border"
+                style={msg.role === 'user'
+                  ? {
+                      backgroundColor: `${primaryColor}30`,
+                      borderColor: `${primaryColor}50`,
+                      color: '#f3f4f6'
+                    }
+                  : {
+                      backgroundColor: 'rgba(255,255,255,0.05)',
+                      borderColor: `${primaryColor}33`,
+                      color: textColor
+                    }
+                }
               >
-                <div className="text-xs font-semibold mb-2 text-purple-300">
+                <div className="text-xs font-semibold mb-2" style={{ color: accentColor }}>
                   {msg.role === 'user' ? 'You' : universe?.name}
                 </div>
                 <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
@@ -203,12 +238,12 @@ export default function ChatPage() {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="max-w-3xl rounded-xl p-4 bg-white/5 border border-purple-500/20">
-                <div className="text-xs font-semibold mb-2 text-purple-300">
+              <div className="max-w-3xl rounded-xl p-4 bg-white/5 border" style={{ borderColor: `${primaryColor}33` }}>
+                <div className="text-xs font-semibold mb-2" style={{ color: accentColor }}>
                   {universe?.name}
                 </div>
-                <div className="flex items-center gap-2 text-purple-300">
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-purple-400"></div>
+                <div className="flex items-center gap-2" style={{ color: accentColor }}>
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2" style={{ borderColor: primaryColor }}></div>
                   <span>Thinking...</span>
                 </div>
               </div>
@@ -226,7 +261,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-purple-800/30 bg-black/20 backdrop-blur-sm">
+      <div className="border-t bg-black/20 backdrop-blur-sm" style={{ borderColor: `${primaryColor}20` }}>
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex gap-3">
             <textarea
@@ -234,19 +269,25 @@ export default function ChatPage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Type your message... (Shift+Enter for new line)"
-              className="flex-1 bg-white/5 border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-400/50 focus:outline-none focus:border-purple-500 resize-none"
+              className="flex-1 bg-white/5 border rounded-xl px-4 py-3 text-white resize-none focus:outline-none"
+              style={{
+                borderColor: `${primaryColor}50`,
+                color: '#ffffff',
+                placeholderColor: `${accentColor}80`
+              }}
               rows={2}
               disabled={loading}
             />
             <button
               onClick={sendMessage}
               disabled={!input.trim() || loading}
-              className="px-8 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/30 disabled:cursor-not-allowed text-white rounded-xl transition font-medium"
+              className="px-8 py-3 text-white rounded-xl transition font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90"
+              style={{ backgroundColor: primaryColor }}
             >
               Send
             </button>
           </div>
-          <div className="mt-2 text-purple-400 text-xs text-center">
+          <div className="mt-2 text-xs text-center" style={{ color: accentColor }}>
             Press Enter to send • Shift+Enter for new line
           </div>
         </div>
