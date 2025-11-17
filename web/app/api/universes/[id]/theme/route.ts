@@ -3,7 +3,7 @@ import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import yaml from 'js-yaml';
 
-const PROJECT_ROOT = join(process.cwd(), '..');
+const PROJECT_ROOT = process.cwd();
 
 interface UniverseTheme {
   primary: string;

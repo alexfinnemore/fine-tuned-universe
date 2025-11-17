@@ -281,8 +281,7 @@ export default function UniversePage() {
                   className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:text-white hover:file:opacity-90 transition"
                   style={{
                     color: textColor,
-                    backgroundColor: `${primaryColor}10`,
-                    fileButtonBackgroundColor: primaryColor
+                    backgroundColor: `${primaryColor}10`
                   }}
                 />
               </div>

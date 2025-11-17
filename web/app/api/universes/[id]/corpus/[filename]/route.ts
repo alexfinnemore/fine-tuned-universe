@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-const PROJECT_ROOT = join(process.cwd(), '..');
+const PROJECT_ROOT = process.cwd();
 
 export async function GET(
   request: Request,

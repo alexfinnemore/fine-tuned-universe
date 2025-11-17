@@ -1,24 +1,12 @@
 import { NextResponse } from 'next/server';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { loadUniverseConfig } from '../../../dist/utils/config.js';
+import { loadCorpus } from '../../../dist/utils/corpus.js';
+import { buildSystemPrompt } from '../../../dist/core/prompt.js';
+import { ClaudeClient } from '../../../dist/core/claude.js';
 
-// Import from CLI source
-const PROJECT_ROOT = join(process.cwd(), '..');
-
-// Dynamic imports to handle ES modules
-async function loadChatDependencies() {
-  const configModule = await import(join(PROJECT_ROOT, 'dist/utils/config.js'));
-  const corpusModule = await import(join(PROJECT_ROOT, 'dist/utils/corpus.js'));
-  const promptModule = await import(join(PROJECT_ROOT, 'dist/core/prompt.js'));
-  const claudeModule = await import(join(PROJECT_ROOT, 'dist/core/claude.js'));
-
-  return {
-    loadUniverseConfig: configModule.loadUniverseConfig,
-    loadCorpus: corpusModule.loadCorpus,
-    buildSystemPrompt: promptModule.buildSystemPrompt,
-    ClaudeClient: claudeModule.ClaudeClient,
-  };
-}
+const PROJECT_ROOT = process.cwd();
 
 interface Message {
   role: 'user' | 'assistant';
@@ -56,14 +44,6 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-
-    // Load dependencies
-    const {
-      loadUniverseConfig,
-      loadCorpus,
-      buildSystemPrompt,
-      ClaudeClient,
-    } = await loadChatDependencies();
 
     // Load universe
     const config = loadUniverseConfig(universePath);

@@ -269,11 +269,10 @@ export default function ChatPage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Type your message... (Shift+Enter for new line)"
-              className="flex-1 bg-white/5 border rounded-xl px-4 py-3 text-white resize-none focus:outline-none"
+              className="flex-1 bg-white/5 border rounded-xl px-4 py-3 text-white resize-none focus:outline-none placeholder-opacity-50"
               style={{
                 borderColor: `${primaryColor}50`,
-                color: '#ffffff',
-                placeholderColor: `${accentColor}80`
+                color: '#ffffff'
               }}
               rows={2}
               disabled={loading}

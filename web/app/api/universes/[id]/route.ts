@@ -3,7 +3,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import yaml from 'js-yaml';
 
-const PROJECT_ROOT = join(process.cwd(), '..');
+const PROJECT_ROOT = process.cwd();
 
 export async function GET(
   request: Request,
