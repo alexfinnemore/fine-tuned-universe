@@ -96,12 +96,12 @@ export default function HowItWorksPage() {
 // Simple markdown renderer component
 function MarkdownContent({ content }: { content: string }) {
   const lines = content.split('\n');
-  const elements: JSX.Element[] = [];
+  const elements: React.JSX.Element[] = [];
   let currentIndex = 0;
 
   // Helper function to format inline markdown (bold, inline code, links)
   const formatInline = (text: string) => {
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.JSX.Element)[] = [];
     let remaining = text;
     let key = 0;
 
