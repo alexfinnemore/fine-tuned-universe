@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "cp -r ../dist ./dist && cp -r ../templates ./templates && cp ../HOW-IT-WORKS-*.md ./ && next build",
+    "build": "cd .. && npm run build && cd web && cp -r ../dist ./dist && cp -r ../templates ./templates && cp ../HOW-IT-WORKS-*.md ./ && next build",
     "start": "next start",
     "lint": "eslint"
   },
