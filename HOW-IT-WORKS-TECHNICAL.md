@@ -268,6 +268,1045 @@ export async function POST(request: Request) {
 
 ---
 
+## Linear User Journey Workflows
+
+This section shows **exactly** what happens, step by step, for common user actions. Each workflow shows the precise sequence of function calls, data transformations, and API interactions.
+
+### Journey 1: Chatting with a Universe (CLI)
+
+**User Action**: `npm run chat universe-k` then types "What is consciousness?"
+
+#### Step-by-Step Execution:
+
+**1. Command Invocation** (`package.json` → `dist/commands/chat.js`)
+```bash
+npm run chat universe-k
+# Executes: node dist/index.js chat universe-k
+```
+
+**2. CLI Entry Point** (`dist/index.js`)
+```typescript
+// Parse command line arguments
+const program = new Command();
+program
+  .command('chat <universe>')
+  .action((universe) => {
+    chatCommand(universe);  // Call chat handler
+  });
+```
+
+**3. Chat Command Handler** (`dist/commands/chat.js`)
+```typescript
+export async function chatCommand(universeId: string) {
+  // Step 3a: Locate universe directory
+  const templatePath = join(process.cwd(), 'templates', universeId);
+  const userPath = join(process.cwd(), 'universes', universeId);
+
+  let universePath: string;
+  if (existsSync(userPath)) {
+    universePath = userPath;  // User universe takes priority
+  } else if (existsSync(templatePath)) {
+    universePath = templatePath;  // Fall back to template
+  } else {
+    throw new Error('Universe not found');
+  }
+
+  // Step 3b: Load configuration
+  const config = loadUniverseConfig(universePath);
+  // config = { name: "Universe K", personality: "...", model: "...", rules: [...] }
+
+  // Step 3c: Load corpus files
+  const corpus = loadCorpus(universePath);
+  // corpus = [
+  //   { path: "mycelial-networks.md", content: "...", tokens: 1234 },
+  //   { path: "quantum-encryption.md", content: "...", tokens: 2345 }
+  // ]
+
+  // Step 3d: Build system prompt
+  const systemPrompt = buildSystemPrompt(config, corpus);
+  // systemPrompt = "# You are Universe K\n\n[full personality + rules + corpus]"
+
+  // Step 3e: Initialize Claude client
+  const claude = new ClaudeClient(config.model);
+  // Creates Anthropic SDK client with API key from process.env.ANTHROPIC_API_KEY
+
+  // Step 3f: Load conversation history (if exists)
+  const historyPath = join(universePath, '.history', 'latest.json');
+  let messages = [];
+  if (existsSync(historyPath)) {
+    messages = JSON.parse(readFileSync(historyPath, 'utf-8'));
+    // messages = [{ role: 'user', content: '...' }, { role: 'assistant', content: '...' }]
+  }
+
+  // Step 3g: Display welcome screen
+  console.log(`💬 ${config.name}`);
+  console.log(`────────────────────────────────`);
+
+  // Step 3h: Start interactive prompt loop
+  startChatLoop();
+}
+```
+
+**4. User Types Message** (Interactive prompt via readline)
+```typescript
+async function startChatLoop() {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+  while (true) {
+    // Step 4a: Get user input
+    const userInput = await rl.question('You: ');
+    // userInput = "What is consciousness?"
+
+    if (userInput.trim() === '') continue;
+
+    // Step 4b: Add user message to conversation
+    messages.push({ role: 'user', content: userInput });
+    // messages = [{ role: 'user', content: 'What is consciousness?' }]
+
+    // Proceed to Claude API call...
+  }
+}
+```
+
+**5. Call Claude API** (`dist/core/claude.js`)
+```typescript
+// Step 5a: Prepare API request
+const response = await claude.chat(systemPrompt, messages);
+
+// Inside ClaudeClient.chat():
+async chat(systemPrompt: string, messages: Message[]) {
+  // Step 5b: Make HTTP request to Anthropic
+  const response = await this.client.messages.create({
+    model: this.model,              // "claude-sonnet-4-20250514"
+    max_tokens: 8192,
+    system: systemPrompt,           // Full universe definition (~10K tokens)
+    messages: messages.map(m => ({
+      role: m.role,                 // 'user'
+      content: m.content,           // 'What is consciousness?'
+    })),
+  });
+
+  // Step 5c: Extract response data
+  const responseText = response.content[0].text;
+  // responseText = "Consciousness is [lengthy philosophical response]..."
+
+  const inputTokens = response.usage.input_tokens;    // e.g., 10,245
+  const outputTokens = response.usage.output_tokens;  // e.g., 543
+
+  // Step 5d: Calculate cost
+  const cost = this.calculateCost(inputTokens, outputTokens);
+  // cost = 10245 * 0.000003 + 543 * 0.000015 = $0.03885
+
+  // Step 5e: Return result
+  return {
+    response: responseText,
+    inputTokens,
+    outputTokens,
+    cost,
+  };
+}
+```
+
+**6. Display Response and Update State**
+```typescript
+// Step 6a: Add assistant message to conversation
+messages.push({ role: 'assistant', content: response.response });
+
+// Step 6b: Display to user
+console.log(`\n${config.name}: ${response.response}\n`);
+
+// Step 6c: Update token tracking
+totalInputTokens += response.inputTokens;
+totalOutputTokens += response.outputTokens;
+totalCost += response.cost;
+
+// Step 6d: Display stats
+console.log(`📊 This message: ${response.inputTokens + response.outputTokens} tokens | $${response.cost.toFixed(4)}`);
+console.log(`💰 Session total: ${totalInputTokens + totalOutputTokens} tokens | $${totalCost.toFixed(4)}`);
+
+// Step 6e: Save conversation history to disk
+const historyPath = join(universePath, '.history', 'latest.json');
+writeFileSync(historyPath, JSON.stringify(messages, null, 2));
+
+// Step 6f: Return to prompt for next message
+// (Loop continues until user types 'exit')
+```
+
+**Complete Flow Summary**:
+```
+User types command
+  ↓
+Locate universe directory (templates/ or universes/)
+  ↓
+Load config.yml → Parse YAML → Validate fields
+  ↓
+Load corpus/*.md → Read all .md files → Estimate tokens
+  ↓
+Build system prompt → Combine config + corpus → Generate text
+  ↓
+Initialize Claude client → Load API key from .env
+  ↓
+Load conversation history (if exists) → Read .history/latest.json
+  ↓
+Display welcome screen
+  ↓
+Start interactive loop:
+  ↓
+  User types message
+    ↓
+  Add to messages array
+    ↓
+  Call Claude API:
+    - Send system prompt (full universe definition)
+    - Send messages array (conversation history)
+    - Receive response + token counts
+    ↓
+  Display response
+    ↓
+  Update token/cost totals
+    ↓
+  Save conversation history to .history/
+    ↓
+  Repeat loop
+```
+
+---
+
+### Journey 2: Chatting with a Universe (Web)
+
+**User Action**: Opens http://localhost:3000, clicks "Universe K", navigates to chat, types "What is consciousness?"
+
+#### Step-by-Step Execution:
+
+**1. Home Page Load** (`web/app/page.tsx`)
+```typescript
+// Step 1a: Component mounts
+useEffect(() => {
+  fetchUniverses();
+}, []);
+
+// Step 1b: Fetch universes from API
+async function fetchUniverses() {
+  const res = await fetch('/api/universes');
+  const data = await res.json();
+  setUniverses(data.universes);
+}
+```
+
+**2. API: List Universes** (`web/app/api/universes/route.ts`)
+```typescript
+export async function GET() {
+  // Step 2a: Scan template directories
+  const templatesDir = join(process.cwd(), 'templates');
+  const templateDirs = readdirSync(templatesDir);
+
+  // Step 2b: Scan user universe directories
+  const universesDir = join(process.cwd(), 'universes');
+  const userDirs = existsSync(universesDir) ? readdirSync(universesDir) : [];
+
+  // Step 2c: Load each universe config
+  const universes = [];
+  for (const dir of [...templateDirs, ...userDirs]) {
+    const config = loadUniverseConfig(join(templatesDir, dir));
+    const corpus = loadCorpus(join(templatesDir, dir));
+
+    universes.push({
+      id: dir,
+      name: config.name,
+      personality: config.personality,
+      corpusCount: corpus.length,
+      model: config.model,
+      type: templateDirs.includes(dir) ? 'template' : 'user',
+    });
+  }
+
+  // Step 2d: Return JSON
+  return NextResponse.json({ universes });
+}
+```
+
+**3. User Clicks "Universe K"**
+```typescript
+// Step 3a: Next.js navigation
+<Link href={`/universe/${universe.id}`}>
+  {/* User clicks this */}
+</Link>
+
+// Step 3b: Navigate to /universe/universe-k
+// Loads web/app/universe/[id]/page.tsx
+```
+
+**4. Universe Detail Page Load** (`web/app/universe/[id]/page.tsx`)
+```typescript
+// Step 4a: Component mounts
+useEffect(() => {
+  fetchUniverseData();
+}, []);
+
+// Step 4b: Fetch universe details
+async function fetchUniverseData() {
+  // Fetch config and corpus info
+  const res = await fetch(`/api/universes/${params.id}`);
+  const data = await res.json();
+  setUniverse(data);
+
+  // Fetch theme colors
+  const themeRes = await fetch(`/api/universes/${params.id}/theme`);
+  const themeData = await themeRes.json();
+  setTheme(themeData.theme);
+}
+```
+
+**5. User Clicks "Chat" Button**
+```typescript
+// Step 5a: Navigate to chat page
+<Link href={`/universe/${params.id}/chat`}>
+  💬 Start Chatting
+</Link>
+
+// Step 5b: Loads web/app/universe/[id]/chat/page.tsx
+```
+
+**6. Chat Page Load** (`web/app/universe/[id]/chat/page.tsx`)
+```typescript
+// Step 6a: Initialize state
+const [messages, setMessages] = useState<Message[]>([]);
+const [input, setInput] = useState('');
+const [totalTokens, setTotalTokens] = useState(0);
+const [totalCost, setTotalCost] = useState(0);
+
+// Step 6b: Fetch universe info for display
+useEffect(() => {
+  async function fetchData() {
+    const res = await fetch(`/api/universes/${params.id}`);
+    const data = await res.json();
+    setUniverse(data);
+
+    const themeRes = await fetch(`/api/universes/${params.id}/theme`);
+    const themeData = await themeRes.json();
+    setTheme(themeData.theme);
+  }
+  fetchData();
+}, [params.id]);
+
+// Step 6c: Display empty chat interface
+// User sees: "Start a conversation" placeholder
+```
+
+**7. User Types Message** (Client-side input handling)
+```typescript
+// Step 7a: User types in textarea
+<textarea
+  value={input}
+  onChange={(e) => setInput(e.target.value)}
+  onKeyPress={handleKeyPress}
+/>
+
+// Step 7b: User presses Enter
+function handleKeyPress(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();  // Trigger send
+  }
+}
+```
+
+**8. Send Message to API** (Client-side)
+```typescript
+async function sendMessage() {
+  // Step 8a: Validate input
+  if (!input.trim() || loading) return;
+
+  // Step 8b: Create user message object
+  const userMessage = { role: 'user', content: input };
+  // userMessage = { role: 'user', content: 'What is consciousness?' }
+
+  // Step 8c: Update UI immediately (optimistic update)
+  const newMessages = [...messages, userMessage];
+  setMessages(newMessages);
+  setInput('');  // Clear input field
+  setLoading(true);  // Show loading indicator
+
+  // Step 8d: Make API request
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      universeId: params.id,  // "universe-k"
+      messages: newMessages,   // [{ role: 'user', content: '...' }]
+    }),
+  });
+
+  // Continue to API handler...
+}
+```
+
+**9. API: Process Chat Request** (`web/app/api/chat/route.ts`)
+```typescript
+export async function POST(request: Request) {
+  // Step 9a: Parse request body
+  const { universeId, messages } = await request.json();
+  // universeId = "universe-k"
+  // messages = [{ role: 'user', content: 'What is consciousness?' }]
+
+  // Step 9b: Validate input
+  if (!universeId || !messages || !Array.isArray(messages)) {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
+
+  // Step 9c: Locate universe directory
+  const templatePath = join(process.cwd(), 'templates', universeId);
+  const userPath = join(process.cwd(), 'universes', universeId);
+
+  let universePath;
+  if (existsSync(userPath)) {
+    universePath = userPath;
+  } else if (existsSync(templatePath)) {
+    universePath = templatePath;
+  } else {
+    return NextResponse.json({ error: 'Universe not found' }, { status: 404 });
+  }
+
+  // Step 9d: Load universe (same as CLI)
+  const config = loadUniverseConfig(universePath);
+  const corpus = loadCorpus(universePath);
+  const systemPrompt = buildSystemPrompt(config, corpus);
+
+  // Step 9e: Initialize Claude client
+  const claude = new ClaudeClient(config.model);
+
+  // Step 9f: Call Claude API
+  const result = await claude.chat(systemPrompt, messages);
+  // result = { response: "...", inputTokens: 10245, outputTokens: 543, cost: 0.03885 }
+
+  // Step 9g: Return response as JSON
+  return NextResponse.json({
+    response: result.response,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    cost: result.cost,
+  });
+}
+```
+
+**10. Handle API Response** (Client-side)
+```typescript
+// Step 10a: Receive response
+const data = await res.json();
+// data = { response: "Consciousness is...", inputTokens: 10245, outputTokens: 543, cost: 0.03885 }
+
+// Step 10b: Add assistant message to state
+setMessages([
+  ...newMessages,
+  { role: 'assistant', content: data.response }
+]);
+
+// Step 10c: Update token/cost tracking
+setTotalTokens(prev => prev + data.inputTokens + data.outputTokens);
+setTotalCost(prev => prev + data.cost);
+
+// Step 10d: Hide loading indicator
+setLoading(false);
+
+// Step 10e: Auto-scroll to bottom
+messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+```
+
+**11. UI Updates** (React re-render)
+```typescript
+// Step 11a: Messages array updated → UI re-renders
+{messages.map((msg, i) => (
+  <div key={i} className={msg.role === 'user' ? 'justify-end' : 'justify-start'}>
+    <div className="message-bubble">
+      {msg.content}
+    </div>
+  </div>
+))}
+
+// Step 11b: Token/cost display updated
+<div className="text-sm">
+  {totalTokens.toLocaleString()} tokens
+</div>
+<div className="text-xs">
+  ${totalCost.toFixed(4)}
+</div>
+
+// Step 11c: User can send next message
+// (Loading state cleared, input field re-enabled)
+```
+
+**Complete Flow Summary**:
+```
+User opens browser → http://localhost:3000
+  ↓
+Home page loads → useEffect triggers
+  ↓
+Fetch /api/universes → GET request
+  ↓
+API scans templates/ and universes/ directories
+  ↓
+Load each config.yml → Return universe list
+  ↓
+Display universe cards on home page
+  ↓
+User clicks "Universe K"
+  ↓
+Navigate to /universe/universe-k
+  ↓
+Detail page loads → Fetch universe data + theme
+  ↓
+Display corpus files, images, config
+  ↓
+User clicks "Chat" button
+  ↓
+Navigate to /universe/universe-k/chat
+  ↓
+Chat page loads → Fetch universe info for header
+  ↓
+Display empty chat interface
+  ↓
+User types message → Update input state
+  ↓
+User presses Enter → sendMessage()
+  ↓
+Optimistic UI update (add user message immediately)
+  ↓
+POST to /api/chat with universeId + messages
+  ↓
+API locates universe directory
+  ↓
+Load config → Load corpus → Build system prompt
+  ↓
+Initialize Claude client → Load API key
+  ↓
+Call Claude API:
+  - Send system prompt (full universe)
+  - Send messages array
+  - Wait for response
+  ↓
+API returns JSON: { response, inputTokens, outputTokens, cost }
+  ↓
+Client receives response
+  ↓
+Update messages state (add assistant message)
+  ↓
+Update token/cost totals
+  ↓
+React re-renders → Display new message
+  ↓
+Auto-scroll to bottom
+  ↓
+Clear loading state
+  ↓
+User can send next message
+```
+
+---
+
+### Journey 3: Creating a New Universe (CLI)
+
+**User Action**: `npm run create-universe my-universe`
+
+#### Step-by-Step Execution:
+
+**1. Command Invocation**
+```bash
+npm run create-universe my-universe
+# Executes: node dist/index.js create my-universe
+```
+
+**2. Create Command Handler** (`dist/commands/create.js`)
+```typescript
+export async function createCommand(universeId: string) {
+  // Step 2a: Validate universe ID
+  if (!universeId || universeId.trim() === '') {
+    throw new Error('Universe ID is required');
+  }
+
+  // Step 2b: Check if universe already exists
+  const universePath = join(process.cwd(), 'universes', universeId);
+  if (existsSync(universePath)) {
+    throw new Error(`Universe "${universeId}" already exists`);
+  }
+
+  // Step 2c: Create directory structure
+  mkdirSync(universePath, { recursive: true });
+  mkdirSync(join(universePath, 'corpus'));
+  mkdirSync(join(universePath, 'images'));
+  mkdirSync(join(universePath, '.history'));
+
+  // Step 2d: Prompt user for configuration
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+  console.log('Creating new universe...\n');
+
+  const name = await rl.question('Name: ');
+  const personality = await rl.question('Personality (1-2 sentences): ');
+  const tone = await rl.question('Tone (e.g., philosophical, scientific): ');
+  const creativity = await rl.question('Creativity (low/medium/high/very-high): ');
+
+  // Step 2e: Create default config
+  const config = {
+    name: name || universeId,
+    personality: personality || 'A helpful AI assistant',
+    model: 'claude-sonnet-4-20250514',
+    rules: [
+      'Be helpful and informative',
+      'Maintain a consistent personality',
+    ],
+    tone: tone || 'conversational',
+    creativity: creativity || 'medium',
+    output_length: 'medium',
+    collaboration_enabled: false,
+  };
+
+  // Step 2f: Write config.yml
+  const configYaml = yaml.dump(config);
+  writeFileSync(join(universePath, 'config.yml'), configYaml);
+
+  // Step 2g: Create starter corpus file
+  const starterCorpus = `# Getting Started
+
+This is your universe's knowledge base. Add more files to expand what your universe knows about.
+
+## Example Topics
+
+- Background information
+- Style references
+- Domain knowledge
+- Creative influences
+`;
+
+  writeFileSync(join(universePath, 'corpus', 'getting-started.md'), starterCorpus);
+
+  // Step 2h: Display success message
+  console.log(`\n✅ Universe "${universeId}" created successfully!`);
+  console.log(`\nLocation: universes/${universeId}/`);
+  console.log('\nNext steps:');
+  console.log(`1. Edit universes/${universeId}/config.yml`);
+  console.log(`2. Add corpus files to universes/${universeId}/corpus/`);
+  console.log(`3. Start chatting: npm run chat ${universeId}`);
+}
+```
+
+**Complete Flow**:
+```
+User runs command
+  ↓
+Validate universe ID (not empty, not exists)
+  ↓
+Create directory structure:
+  universes/my-universe/
+    corpus/
+    images/
+    .history/
+  ↓
+Interactive prompts:
+  - Name?
+  - Personality?
+  - Tone?
+  - Creativity?
+  ↓
+Build config object with defaults
+  ↓
+Write config.yml (YAML format)
+  ↓
+Create starter corpus file (getting-started.md)
+  ↓
+Display success message with next steps
+```
+
+---
+
+### Journey 4: Editing Corpus Files (Web)
+
+**User Action**: Opens /universe/universe-k, clicks "mycelial-networks.md", edits content, saves
+
+#### Step-by-Step Execution:
+
+**1. User Views Corpus File List** (`web/app/universe/[id]/page.tsx`)
+```typescript
+// Step 1a: Universe detail page displays corpus files
+{universe.corpusFiles.map((file) => (
+  <button onClick={() => viewCorpusFile(file.name)}>
+    📄 {file.name}
+    <span className="text-xs">{file.tokens} tokens</span>
+  </button>
+))}
+```
+
+**2. User Clicks Corpus File**
+```typescript
+// Step 2a: Click handler
+function viewCorpusFile(filename: string) {
+  setSelectedCorpus(filename);  // Update state
+  fetchCorpusContent(filename);  // Load content
+}
+
+// Step 2b: Fetch corpus content
+async function fetchCorpusContent(filename: string) {
+  const res = await fetch(`/api/universes/${params.id}/corpus/${filename}`);
+  const data = await res.json();
+
+  setCorpusContent(data.content);  // Store content
+  setEditingCorpus(false);          // View mode (not edit)
+}
+```
+
+**3. API: Get Corpus File** (`web/app/api/universes/[id]/corpus/[filename]/route.ts`)
+```typescript
+export async function GET(request: Request, { params }: { params: { id: string, filename: string } }) {
+  // Step 3a: Resolve params
+  const { id, filename } = await params;
+
+  // Step 3b: Locate universe
+  const universePath = locateUniverse(id);
+
+  // Step 3c: Build file path
+  const filePath = join(universePath, 'corpus', `${filename}.md`);
+
+  // Step 3d: Check if file exists
+  if (!existsSync(filePath)) {
+    return NextResponse.json({ error: 'File not found' }, { status: 404 });
+  }
+
+  // Step 3e: Read file content
+  const content = readFileSync(filePath, 'utf-8');
+
+  // Step 3f: Estimate tokens
+  const tokens = estimateTokens(content);
+
+  // Step 3g: Return JSON
+  return NextResponse.json({
+    filename,
+    content,
+    tokens,
+  });
+}
+```
+
+**4. Display Corpus Content** (Client-side)
+```typescript
+// Step 4a: Modal/panel opens showing content
+{selectedCorpus && (
+  <div className="corpus-viewer">
+    <h3>📄 {selectedCorpus}</h3>
+
+    {editingCorpus ? (
+      // Edit mode: textarea
+      <textarea
+        value={editedContent}
+        onChange={(e) => setEditedContent(e.target.value)}
+      />
+    ) : (
+      // View mode: formatted markdown
+      <pre className="whitespace-pre-wrap">{corpusContent}</pre>
+    )}
+
+    {!editingCorpus && (
+      <button onClick={() => startEditingCorpus()}>
+        ✏️ Edit
+      </button>
+    )}
+  </div>
+)}
+```
+
+**5. User Clicks "Edit"**
+```typescript
+function startEditingCorpus() {
+  setEditedContent(corpusContent);  // Copy current content to edit buffer
+  setEditingCorpus(true);            // Switch to edit mode
+}
+
+// Step 5b: UI switches to textarea
+// User can now modify content
+```
+
+**6. User Edits Content and Clicks "Save"**
+```typescript
+async function saveCorpusFile() {
+  // Step 6a: Validate content
+  if (!editedContent.trim()) {
+    alert('Content cannot be empty');
+    return;
+  }
+
+  setSaving(true);  // Show loading state
+
+  // Step 6b: Send PUT request
+  const res = await fetch(`/api/universes/${params.id}/corpus/${selectedCorpus}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      content: editedContent,
+    }),
+  });
+
+  if (!res.ok) {
+    alert('Failed to save');
+    setSaving(false);
+    return;
+  }
+
+  // Step 6c: Update local state
+  setCorpusContent(editedContent);  // Update view with new content
+  setEditingCorpus(false);           // Exit edit mode
+  setSaving(false);
+
+  // Step 6d: Refresh corpus list (to update token counts)
+  fetchUniverseData();
+}
+```
+
+**7. API: Save Corpus File** (`web/app/api/universes/[id]/corpus/[filename]/route.ts`)
+```typescript
+export async function PUT(request: Request, { params }: { params: { id: string, filename: string } }) {
+  // Step 7a: Parse request
+  const { id, filename } = await params;
+  const { content } = await request.json();
+
+  // Step 7b: Validate content
+  if (!content || typeof content !== 'string') {
+    return NextResponse.json({ error: 'Invalid content' }, { status: 400 });
+  }
+
+  // Step 7c: Locate universe
+  const universePath = locateUniverse(id);
+
+  // Step 7d: Build file path
+  const filePath = join(universePath, 'corpus', `${filename}.md`);
+
+  // Step 7e: Write to disk
+  writeFileSync(filePath, content, 'utf-8');
+
+  // Step 7f: Re-calculate tokens
+  const tokens = estimateTokens(content);
+
+  // Step 7g: Return success
+  return NextResponse.json({
+    success: true,
+    tokens,
+  });
+}
+```
+
+**8. UI Updates**
+```typescript
+// Step 8a: Exit edit mode → Show view mode
+// Step 8b: Display success indicator
+// Step 8c: Updated token count displayed in corpus list
+```
+
+**Complete Flow**:
+```
+User on universe detail page
+  ↓
+Corpus files listed with token counts
+  ↓
+User clicks "mycelial-networks.md"
+  ↓
+Click handler: setSelectedCorpus()
+  ↓
+Fetch /api/universes/universe-k/corpus/mycelial-networks → GET
+  ↓
+API: Locate universe → Read corpus/mycelial-networks.md → Return content
+  ↓
+Client: Display in modal/panel (view mode)
+  ↓
+User clicks "Edit" button
+  ↓
+Copy content to edit buffer → Switch to textarea
+  ↓
+User modifies content
+  ↓
+User clicks "Save"
+  ↓
+Validate content → Show loading state
+  ↓
+PUT /api/universes/universe-k/corpus/mycelial-networks
+  ↓
+API: Validate → Locate universe → Write to disk → Calculate tokens
+  ↓
+Return success
+  ↓
+Client: Update local state → Exit edit mode → Refresh list
+  ↓
+UI shows updated content and token count
+```
+
+---
+
+### Journey 5: Getting Dynamic Theme (Web)
+
+**User Action**: Opens /universe/universe-k → Page displays with custom purple/gray theme
+
+#### Step-by-Step Execution:
+
+**1. Universe Detail Page Mounts** (`web/app/universe/[id]/page.tsx`)
+```typescript
+useEffect(() => {
+  async function fetchData() {
+    // Step 1a: Fetch universe details
+    const res = await fetch(`/api/universes/${params.id}`);
+    const data = await res.json();
+    setUniverse(data);
+
+    // Step 1b: Fetch theme colors
+    const themeRes = await fetch(`/api/universes/${params.id}/theme`);
+    const themeData = await themeRes.json();
+    setTheme(themeData.theme);
+    // theme = { primary: '#6b7280', accent: '#9ca3af', gradient: [...] }
+  }
+  fetchData();
+}, [params.id]);
+```
+
+**2. API: Generate Theme** (`web/app/api/universes/[id]/theme/route.ts`)
+```typescript
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  // Step 2a: Resolve universe ID
+  const { id } = await params;
+
+  // Step 2b: Locate universe
+  const universePath = locateUniverse(id);
+
+  // Step 2c: Load config
+  const configPath = join(universePath, 'config.yml');
+  const config = yaml.load(readFileSync(configPath, 'utf-8'));
+
+  // Step 2d: Get corpus file names
+  const corpusDir = join(universePath, 'corpus');
+  const corpusFiles = existsSync(corpusDir)
+    ? readdirSync(corpusDir).filter(f => f.endsWith('.md')).map(f => f.replace('.md', ''))
+    : [];
+  // corpusFiles = ['mycelial-networks', 'quantum-encryption', 'prague-labyrinth']
+
+  // Step 2e: Analyze aesthetic
+  const aesthetic = analyzeUniverseAesthetic(config, corpusFiles);
+
+  // Inside analyzeUniverseAesthetic():
+  function analyzeUniverseAesthetic(config, corpusFiles) {
+    // Step 2e-1: Combine all text
+    const text = `${config.name} ${config.personality} ${config.tone} ${corpusFiles.join(' ')}`.toLowerCase();
+    // text = "universe k narrator of k's story—kafkaesque... philosophical scientific melancholic mycelial-networks quantum-encryption prague-labyrinth"
+
+    // Step 2e-2: Keyword matching
+    if (text.includes('mycelium') || text.includes('fungal') || text.includes('spore')) {
+      return 'mycelial';  // Green theme
+    }
+    if (text.includes('quantum') || text.includes('encryption') || text.includes('cryptograph')) {
+      return 'quantum';   // Blue theme
+    }
+    if (text.includes('kafka') || text.includes('prague') || text.includes('labyrinth')) {
+      return 'kafka';     // Gray theme ← MATCHES!
+    }
+    // ... more checks
+
+    return 'default';     // Purple theme (fallback)
+  }
+
+  // Step 2f: Get theme colors
+  const theme = AESTHETIC_THEMES[aesthetic];
+  // aesthetic = 'kafka'
+  // theme = {
+  //   primary: '#6b7280',
+  //   secondary: '#4b5563',
+  //   accent: '#9ca3af',
+  //   background: '#1f2937',
+  //   text: '#d1d5db',
+  //   gradient: ['#111827', '#374151', '#1f2937']
+  // }
+
+  // Step 2g: Return JSON
+  return NextResponse.json({
+    aesthetic,
+    theme,
+    config: {
+      name: config.name,
+      personality: config.personality,
+      tone: config.tone,
+    },
+  });
+}
+```
+
+**3. Apply Theme to UI** (Client-side)
+```typescript
+// Step 3a: Theme state updated → Trigger re-render
+
+// Step 3b: Calculate dynamic styles
+const bgGradient = theme
+  ? `linear-gradient(to bottom right, ${theme.gradient[0]}, ${theme.gradient[1]}, ${theme.gradient[2]})`
+  : 'linear-gradient(to bottom right, #0f172a, #581c87, #0f172a)';
+// bgGradient = "linear-gradient(to bottom right, #111827, #374151, #1f2937)"
+
+const primaryColor = theme?.primary || '#8b5cf6';
+// primaryColor = '#6b7280'
+
+const accentColor = theme?.accent || '#a78bfa';
+// accentColor = '#9ca3af'
+
+const textColor = theme?.text || '#e9d5ff';
+// textColor = '#d1d5db'
+
+// Step 3c: Apply inline styles
+<div style={{ background: bgGradient }}>
+  <h1 style={{ color: textColor }}>
+    {universe.name}
+  </h1>
+
+  <button style={{ backgroundColor: primaryColor }}>
+    💬 Chat
+  </button>
+
+  <div style={{ borderColor: `${primaryColor}30` }}>
+    Corpus files
+  </div>
+</div>
+```
+
+**Complete Flow**:
+```
+User navigates to /universe/universe-k
+  ↓
+Page component mounts → useEffect triggers
+  ↓
+Fetch /api/universes/universe-k/theme → GET
+  ↓
+API: Load config.yml
+  ↓
+Get corpus file names
+  ↓
+Analyze aesthetic:
+  - Combine name + personality + tone + corpus filenames
+  - Check for keywords ('kafka', 'prague', 'labyrinth')
+  - Match to 'kafka' aesthetic
+  ↓
+Look up theme colors for 'kafka':
+  - primary: '#6b7280' (gray)
+  - accent: '#9ca3af' (light gray)
+  - gradient: ['#111827', '#374151', '#1f2937'] (dark grays)
+  ↓
+Return JSON: { aesthetic: 'kafka', theme: {...} }
+  ↓
+Client receives theme data
+  ↓
+Update theme state → Trigger re-render
+  ↓
+Calculate dynamic styles:
+  - Background gradient
+  - Button colors
+  - Text colors
+  - Border colors
+  ↓
+Apply inline styles to components
+  ↓
+Page displays with custom gray theme
+```
+
+---
+
 ## Knowledge Base System
 
 ### How Corpus Files Work
