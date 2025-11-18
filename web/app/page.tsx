@@ -82,12 +82,20 @@ export default function Home() {
                 Select a universe to begin your journey
               </p>
             </div>
-            <Link
-              href="/create"
-              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
-            >
-              + Create Universe
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href="/how-it-works"
+                className="px-6 py-3 bg-purple-900/40 hover:bg-purple-900/60 text-purple-300 hover:text-white rounded-lg transition font-medium border border-purple-700/50"
+              >
+                📖 How It Works
+              </Link>
+              <Link
+                href="/create"
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
+              >
+                + Create Universe
+              </Link>
+            </div>
           </div>
         </div>
       </div>
