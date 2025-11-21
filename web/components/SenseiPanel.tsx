@@ -1,12 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { DiffSuggestionComponent } from './DiffSuggestion';
 
 interface SenseiSuggestion {
     id: string;
-    type: 'question' | 'corpus_addition' | 'inconsistency' | 'expansion' | 'clarification';
+    type: 'question' | 'corpus_addition' | 'inconsistency' | 'expansion' | 'clarification' | 'diff';
     content: string;
     priority: 'low' | 'medium' | 'high';
+    diff?: {
+        filePath: string;
+        operation: 'append' | 'insert' | 'replace';
+        afterContent: string;
+        preview: string;
+    };
 }
 
 interface SenseiMessage {
@@ -103,6 +110,32 @@ export function SenseiPanel({
         }
     };
 
+    const handleAcceptDiff = async (suggestion: SenseiSuggestion) => {
+        try {
+            const res = await fetch('/api/sensei/apply-diff', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    universeId,
+                    suggestion
+                })
+            });
+
+            if (res.ok) {
+                // Dismiss the suggestion after successful application
+                onDismissSuggestion(suggestion.id);
+            } else {
+                console.error('Failed to apply diff');
+            }
+        } catch (err) {
+            console.error('Failed to apply diff:', err);
+        }
+    };
+
+    const handleRejectDiff = (id: string) => {
+        onDismissSuggestion(id);
+    };
+
     const getPriorityColor = (priority: string) => {
         switch (priority) {
             case 'high': return '#ef4444';
@@ -167,38 +200,48 @@ export function SenseiPanel({
                             </div>
                         ) : (
                             suggestions.map((suggestion) => (
-                                <div
-                                    key={suggestion.id}
-                                    className="p-3 rounded-lg border"
-                                    style={{
-                                        backgroundColor: 'rgba(255,255,255,0.05)',
-                                        borderColor: `${getPriorityColor(suggestion.priority)}50`,
-                                    }}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-lg">{getTypeIcon(suggestion.type)}</span>
-                                                <span
-                                                    className="text-xs font-semibold uppercase"
-                                                    style={{ color: getPriorityColor(suggestion.priority) }}
-                                                >
-                                                    {suggestion.priority}
-                                                </span>
+                                suggestion.type === 'diff' ? (
+                                    <DiffSuggestionComponent
+                                        key={suggestion.id}
+                                        suggestion={suggestion as any}
+                                        onAccept={() => handleAcceptDiff(suggestion)}
+                                        onReject={() => handleRejectDiff(suggestion.id)}
+                                        theme={theme}
+                                    />
+                                ) : (
+                                    <div
+                                        key={suggestion.id}
+                                        className="p-3 rounded-lg border"
+                                        style={{
+                                            backgroundColor: 'rgba(255,255,255,0.05)',
+                                            borderColor: `${getPriorityColor(suggestion.priority)}50`,
+                                        }}
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-lg">{getTypeIcon(suggestion.type)}</span>
+                                                    <span
+                                                        className="text-xs font-semibold uppercase"
+                                                        style={{ color: getPriorityColor(suggestion.priority) }}
+                                                    >
+                                                        {suggestion.priority}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-white leading-relaxed">
+                                                    {suggestion.content}
+                                                </p>
                                             </div>
-                                            <p className="text-sm text-white leading-relaxed">
-                                                {suggestion.content}
-                                            </p>
+                                            <button
+                                                onClick={() => onDismissSuggestion(suggestion.id)}
+                                                className="text-xs opacity-50 hover:opacity-100 transition"
+                                                style={{ color: theme.text }}
+                                            >
+                                                ✕
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={() => onDismissSuggestion(suggestion.id)}
-                                            className="text-xs opacity-50 hover:opacity-100 transition"
-                                            style={{ color: theme.text }}
-                                        >
-                                            ✕
-                                        </button>
                                     </div>
-                                </div>
+                                )
                             ))
                         )}
                     </div>

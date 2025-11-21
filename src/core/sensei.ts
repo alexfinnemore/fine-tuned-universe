@@ -5,7 +5,7 @@ import type { Message } from './types.js';
 
 export interface SenseiSuggestion {
     id: string;
-    type: 'question' | 'corpus_addition' | 'inconsistency' | 'expansion' | 'clarification';
+    type: 'question' | 'corpus_addition' | 'inconsistency' | 'expansion' | 'clarification' | 'diff';
     content: string;
     context: string;
     priority: 'low' | 'medium' | 'high';
@@ -13,6 +13,14 @@ export interface SenseiSuggestion {
         type: 'add_to_corpus' | 'create_file' | 'update_config';
         target?: string;
         data?: any;
+    };
+    diff?: {
+        filePath: string;
+        operation: 'append' | 'insert' | 'replace';
+        beforeContent?: string;
+        afterContent: string;
+        lineNumber?: number;
+        preview: string;
     };
 }
 
@@ -68,18 +76,90 @@ export class CreativeSensei {
         try {
             const response = await this.client.messages.create({
                 model: 'claude-sonnet-4-20250514',
-                max_tokens: 1024,
+                max_tokens: 2048,
                 messages: [{ role: 'user', content: analysisPrompt }],
             });
 
             const content = response.content[0];
             const analysisText = content.type === 'text' ? content.text : '';
 
-            return this.parseSuggestions(analysisText, userMessage, universeResponse);
+            const suggestions = this.parseSuggestions(analysisText, userMessage, universeResponse);
+
+            // Try to generate diff suggestions for corpus additions
+            const diffSuggestions = await this.generateDiffSuggestionsFromAnalysis(
+                analysisText,
+                universeResponse,
+                context
+            );
+
+            return [...suggestions, ...diffSuggestions];
         } catch (error: any) {
             console.error('Sensei analysis error:', error);
             return [];
         }
+    }
+
+    /**
+     * Generate diff suggestions from analysis
+     */
+    private async generateDiffSuggestionsFromAnalysis(
+        analysisText: string,
+        universeResponse: string,
+        _context: SenseiContext
+    ): Promise<SenseiSuggestion[]> {
+        // Look for corpus_addition suggestions
+        const corpusAdditionMatch = analysisText.match(/"type":\s*"corpus_addition"/);
+        if (!corpusAdditionMatch) return [];
+
+        try {
+            // Extract knowledge from the universe response
+            const extractionPrompt = `Extract concrete knowledge from this universe response that should be added to the corpus.
+
+Universe Response: "${universeResponse}"
+
+Respond with JSON:
+{
+  "topic": "Brief topic name",
+  "content": "The knowledge in markdown format (2-4 sentences)",
+  "suggestedFile": "filename.md",
+  "shouldAdd": true/false
+}
+
+Only extract if there's concrete, specific information worth preserving.`;
+
+            const extractionResponse = await this.client.messages.create({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 512,
+                messages: [{ role: 'user', content: extractionPrompt }],
+            });
+
+            const extractionContent = extractionResponse.content[0];
+            const extractionText = extractionContent.type === 'text' ? extractionContent.text : '';
+
+            const jsonMatch = extractionText.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) return [];
+
+            const extraction = JSON.parse(jsonMatch[0]);
+
+            if (extraction.shouldAdd && extraction.content && extraction.topic) {
+                // Generate diff suggestion
+                const timestamp = new Date().toISOString().split('T')[0];
+                const formattedContent = `## ${extraction.topic} (Added ${timestamp})\n\n${extraction.content}`;
+
+                const diffSuggestion = await this.generateDiffSuggestion(
+                    extraction.topic,
+                    formattedContent,
+                    extraction.suggestedFile,
+                    'append'
+                );
+
+                return [diffSuggestion];
+            }
+        } catch (error) {
+            console.error('Failed to generate diff suggestions:', error);
+        }
+
+        return [];
     }
 
     /**
@@ -222,6 +302,129 @@ export class CreativeSensei {
 
         // Log the addition
         this.logCorpusUpdate(extraction);
+    }
+
+    /**
+     * Generate a diff suggestion for corpus update
+     */
+    async generateDiffSuggestion(
+        topic: string,
+        content: string,
+        filePath: string,
+        operation: 'append' | 'insert' | 'replace' = 'append'
+    ): Promise<SenseiSuggestion> {
+        const corpusPath = join(this.universePath, 'corpus', filePath);
+
+        // Read existing file if it exists
+        let existingContent = '';
+        if (existsSync(corpusPath)) {
+            existingContent = readFileSync(corpusPath, 'utf-8');
+        }
+
+        // Generate diff preview
+        const preview = this.createDiffPreview(existingContent, content, operation);
+
+        return {
+            id: `diff-${Date.now()}`,
+            type: 'diff',
+            content: `Add ${topic} to ${filePath}`,
+            context: '',
+            priority: 'medium',
+            diff: {
+                filePath: `corpus/${filePath}`,
+                operation,
+                afterContent: content,
+                preview
+            }
+        };
+    }
+
+    /**
+     * Create a formatted diff preview
+     */
+    private createDiffPreview(
+        before: string,
+        after: string,
+        operation: 'append' | 'insert' | 'replace'
+    ): string {
+        if (operation === 'append') {
+            // Show only the new content being added
+            return after.split('\n').map(line => `+ ${line}`).join('\n');
+        } else if (operation === 'replace') {
+            // Show before and after
+            const beforeLines = before.split('\n').map(line => `- ${line}`);
+            const afterLines = after.split('\n').map(line => `+ ${line}`);
+            return [...beforeLines, ...afterLines].join('\n');
+        }
+        // Default: just show additions
+        return after.split('\n').map(line => `+ ${line}`).join('\n');
+    }
+
+    /**
+     * Apply accepted diff to corpus file
+     */
+    async applyDiff(suggestion: SenseiSuggestion): Promise<void> {
+        if (!suggestion.diff) {
+            throw new Error('No diff data in suggestion');
+        }
+
+        const { filePath, operation, afterContent } = suggestion.diff;
+        const fullPath = join(this.universePath, filePath);
+
+        // Ensure directory exists
+        const dir = join(this.universePath, 'corpus');
+        if (!existsSync(dir)) {
+            mkdirSync(dir, { recursive: true });
+        }
+
+        if (operation === 'append') {
+            // Append to end of file
+            let existing = '';
+            if (existsSync(fullPath)) {
+                existing = readFileSync(fullPath, 'utf-8');
+            }
+            const updated = existing ? existing + '\n\n' + afterContent : afterContent;
+            writeFileSync(fullPath, updated, 'utf-8');
+        } else if (operation === 'replace') {
+            // Replace entire file
+            writeFileSync(fullPath, afterContent, 'utf-8');
+        }
+
+        // Log the update
+        this.logDiffApplication(suggestion);
+    }
+
+    /**
+     * Log diff application
+     */
+    private logDiffApplication(suggestion: SenseiSuggestion): void {
+        const senseiDir = join(this.universePath, 'sensei');
+
+        if (!existsSync(senseiDir)) {
+            mkdirSync(senseiDir, { recursive: true });
+        }
+
+        const logPath = join(senseiDir, 'knowledge-log.json');
+        let log: any[] = [];
+
+        if (existsSync(logPath)) {
+            try {
+                const data = readFileSync(logPath, 'utf-8');
+                log = JSON.parse(data);
+            } catch (error) {
+                console.error('Failed to read knowledge log:', error);
+            }
+        }
+
+        log.push({
+            timestamp: new Date().toISOString(),
+            topic: suggestion.content,
+            file: suggestion.diff?.filePath,
+            operation: suggestion.diff?.operation,
+            type: 'diff-applied'
+        });
+
+        writeFileSync(logPath, JSON.stringify(log, null, 2), 'utf-8');
     }
 
     /**
