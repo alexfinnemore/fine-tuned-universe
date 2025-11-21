@@ -124,27 +124,47 @@ export async function chat(universeName: string) {
         // Add user message
         messages.push({ role: 'user', content: userInput });
 
-        // Get response from Claude
+        // Get response from Claude with streaming
         const thinkingSpinner = ora('Thinking...').start();
 
         try {
-          const result = await claude.chat(systemPrompt, messages);
+          let fullResponse = '';
+          let inputTokens = 0;
+          let outputTokens = 0;
+          let cost = 0;
 
-          thinkingSpinner.stop();
+          // Stream the response
+          for await (const chunk of claude.chatStream(systemPrompt, messages)) {
+            if (chunk.token) {
+              // First token - stop spinner and show universe name
+              if (fullResponse === '') {
+                thinkingSpinner.stop();
+                process.stdout.write(chalk.blue(`\n${config.name}: `));
+              }
+              // Write token to stdout
+              process.stdout.write(chunk.token);
+              fullResponse += chunk.token;
+            }
+
+            if (chunk.done) {
+              inputTokens = chunk.inputTokens || 0;
+              outputTokens = chunk.outputTokens || 0;
+              cost = chunk.cost || 0;
+            }
+          }
 
           // Add assistant message
-          messages.push({ role: 'assistant', content: result.response });
+          messages.push({ role: 'assistant', content: fullResponse });
 
           // Update stats
-          totalInputTokens += result.inputTokens;
-          totalOutputTokens += result.outputTokens;
-          totalCost += result.cost;
+          totalInputTokens += inputTokens;
+          totalOutputTokens += outputTokens;
+          totalCost += cost;
 
-          // Display response
-          console.log(chalk.blue(`\n${config.name}: `) + result.response);
+          // Display stats
           console.log(
             chalk.gray(
-              `\n[Tokens: ${result.inputTokens + result.outputTokens} | Total: ${totalInputTokens + totalOutputTokens} | Cost: ${claude.formatCost(result.cost)} | Total cost: ${claude.formatCost(totalCost)}]`
+              `\n\n[Tokens: ${inputTokens + outputTokens} | Total: ${totalInputTokens + totalOutputTokens} | Cost: ${claude.formatCost(cost)} | Total cost: ${claude.formatCost(totalCost)}]`
             )
           );
         } catch (error: any) {

@@ -62,6 +62,56 @@ export class ClaudeClient {
     }
   }
 
+  async *chatStream(
+    systemPrompt: string,
+    messages: Message[]
+  ): AsyncGenerator<{
+    token?: string;
+    done?: boolean;
+    inputTokens?: number;
+    outputTokens?: number;
+    cost?: number;
+  }> {
+    try {
+      const stream = await this.client.messages.stream({
+        model: this.model,
+        max_tokens: 8192,
+        system: systemPrompt,
+        messages: messages.map(m => ({
+          role: m.role,
+          content: m.content,
+        })),
+      });
+
+      for await (const chunk of stream) {
+        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+          yield { token: chunk.delta.text };
+        }
+      }
+
+      // Get final message with usage stats
+      const finalMessage = await stream.finalMessage();
+      const inputTokens = finalMessage.usage.input_tokens;
+      const outputTokens = finalMessage.usage.output_tokens;
+      const cost = this.calculateCost(inputTokens, outputTokens);
+
+      yield {
+        done: true,
+        inputTokens,
+        outputTokens,
+        cost,
+      };
+    } catch (error: any) {
+      if (error.status === 401) {
+        throw new Error('Invalid API key. Check your ANTHROPIC_API_KEY in .env');
+      } else if (error.status === 429) {
+        throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+      } else {
+        throw new Error(`Claude API error: ${error.message}`);
+      }
+    }
+  }
+
   private calculateCost(inputTokens: number, outputTokens: number): number {
     return inputTokens * INPUT_PRICE_PER_TOKEN + outputTokens * OUTPUT_PRICE_PER_TOKEN;
   }

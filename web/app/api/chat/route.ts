@@ -18,6 +18,53 @@ interface ChatRequest {
   messages: Message[];
 }
 
+// Cache for universe data (config + system prompt)
+interface UniverseCache {
+  config: any;
+  systemPrompt: string;
+  lastAccess: number;
+}
+
+const universeCache = new Map<string, UniverseCache>();
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+// Clean up stale cache entries
+function cleanCache() {
+  const now = Date.now();
+  for (const [key, value] of universeCache.entries()) {
+    if (now - value.lastAccess > CACHE_TTL) {
+      universeCache.delete(key);
+    }
+  }
+}
+
+// Get or load universe data
+function getUniverseData(universeId: string, universePath: string): UniverseCache {
+  const cached = universeCache.get(universeId);
+  const now = Date.now();
+
+  if (cached && now - cached.lastAccess < CACHE_TTL) {
+    cached.lastAccess = now;
+    return cached;
+  }
+
+  // Load fresh data
+  const config = loadUniverseConfig(universePath);
+  const corpus = loadCorpus(universePath);
+  const systemPrompt = buildSystemPrompt(config, corpus);
+
+  const cacheEntry: UniverseCache = {
+    config,
+    systemPrompt,
+    lastAccess: now,
+  };
+
+  universeCache.set(universeId, cacheEntry);
+  cleanCache(); // Clean up old entries
+
+  return cacheEntry;
+}
+
 export async function POST(request: Request) {
   try {
     const { universeId, messages }: ChatRequest = await request.json();
@@ -45,22 +92,63 @@ export async function POST(request: Request) {
       );
     }
 
-    // Load universe
-    const config = loadUniverseConfig(universePath);
-    const corpus = loadCorpus(universePath);
-    const systemPrompt = buildSystemPrompt(config, corpus);
+    // Get cached universe data
+    const { config, systemPrompt } = getUniverseData(universeId, universePath);
 
     // Initialize Claude client
     const claude = new ClaudeClient(config.model);
 
-    // Get response
-    const result = await claude.chat(systemPrompt, messages);
+    // Create streaming response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          let inputTokens = 0;
+          let outputTokens = 0;
+          let cost = 0;
 
-    return NextResponse.json({
-      response: result.response,
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-      cost: result.cost,
+          // Stream tokens from Claude
+          for await (const chunk of claude.chatStream(systemPrompt, messages)) {
+            if (chunk.token) {
+              // Send token as SSE
+              const data = JSON.stringify({ type: 'token', token: chunk.token });
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            }
+
+            if (chunk.done) {
+              inputTokens = chunk.inputTokens || 0;
+              outputTokens = chunk.outputTokens || 0;
+              cost = chunk.cost || 0;
+
+              // Send final stats
+              const data = JSON.stringify({
+                type: 'done',
+                inputTokens,
+                outputTokens,
+                cost,
+              });
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            }
+          }
+
+          controller.close();
+        } catch (error: any) {
+          const errorData = JSON.stringify({
+            type: 'error',
+            message: error.message,
+          });
+          controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
   } catch (error: any) {
     console.error('Chat API error:', error);
